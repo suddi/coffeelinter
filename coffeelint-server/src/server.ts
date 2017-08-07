@@ -18,6 +18,7 @@ let documents: TextDocuments = new TextDocuments();
 documents.listen(connection);
 
 let coffeeLintConfigFile: string;
+let packageJsonFile: string;
 let projectLintConfig = {};
 let enabled = true;
 let useWorkspace = false;
@@ -43,12 +44,26 @@ connection.onDidChangeConfiguration((change) => {
 });
 
 function loadWorkspaceConfig() {
+	const coffeeLintConfigFileExists = fs.existsSync(coffeeLintConfigFile);
+	const packageJsonFileExists = fs.existsSync(packageJsonFile);
+
 	try {
 		let content = fs.readFileSync(coffeeLintConfigFile, 'utf-8').replace(new RegExp("//.*", "gi"), "");
 		projectLintConfig = JSON.parse(content);
 		useWorkspace = true;
+	} catch (error) {
+		console.log('Failed to read locale coffeelint.json');
 	}
-	catch (error) {
+
+	if (packageJsonFileExists) {
+		const packageJson = require(packageJsonFile);
+		if (packageJson.coffeelintConfig && packageJson.coffeelintConfig.extends) {
+			projectLintConfig = require(packageJson.coffeelintConfig.extends);
+		} else {
+			useWorkspace = false;
+			console.log("No locale lint config");
+		}
+	} else {
 		useWorkspace = false;
 		console.log("No locale lint config");
 	}
@@ -62,6 +77,7 @@ connection.onDidChangeWatchedFiles((change) => {
 connection.onInitialize((params): InitializeResult => {
 	let sourcePath = params.rootPath || "";
 	coffeeLintConfigFile = path.join(sourcePath, 'coffeelint.json');
+	packageJsonFile = path.join(sourcePath, 'package.json');
 
 	loadWorkspaceConfig();
 
